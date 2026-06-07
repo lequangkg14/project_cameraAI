@@ -326,9 +326,29 @@ speakBtn.addEventListener('click',()=>{if(lastDetected)speak(lastDetected.info.s
 function speak(text){
   if(!window.speechSynthesis){alert('Trình duyệt không hỗ trợ TTS!');return;}
   window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';u.rate=0.9;u.pitch=1;u.volume=1;
+  
+  const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';u.volume=1;u.pitch=1;
+  
   const voices=window.speechSynthesis.getVoices();
-  const vi=voices.find(v=>v.lang.startsWith('vi'));if(vi)u.voice=vi;
+  
+  // Tìm kiếm giọng đọc tiếng Việt theo thứ tự ưu tiên chất lượng:
+  // 1. Ưu tiên giọng tự nhiên cao cấp (Có chữ 'Natural' - cực hay trên laptop dùng Edge)
+  // 2. Ưu tiên giọng của Apple (Giúp iPhone của bạn giữ nguyên giọng đọc ổn định hiện tại)
+  // 3. Nếu không có 2 loại trên thì mới lấy giọng Google hoặc giọng Vi-VN bất kỳ có sẵn
+  const viVoice = voices.find(v => v.lang.startsWith('vi') && v.name.includes('Natural')) ||
+                  voices.find(v => v.lang.startsWith('vi') && v.name.includes('Apple')) ||
+                  voices.find(v => v.lang.startsWith('vi') && v.name.includes('Google')) ||
+                  voices.find(v => v.lang.startsWith('vi'));
+                  
+  if(viVoice){
+    u.voice=viVoice;
+    // Nếu là giọng Google trên laptop Chrome, ta giảm tốc độ (rate) xuống một chút (0.8) nghe sẽ đỡ bị giật và nuốt chữ hơn.
+    // Nếu là giọng Apple hoặc giọng Natural, giữ tốc độ gần như bình thường (0.9) cho tự nhiên.
+    u.rate = viVoice.name.includes('Google') ? 0.8 : 0.9;
+  } else {
+    u.rate = 0.9;
+  }
+  
   window.speechSynthesis.speak(u);
 }
 window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();

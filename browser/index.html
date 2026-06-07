@@ -172,7 +172,7 @@ function resolveLabel(raw){
   if(!isNaN(num))return{key:raw,display:num.toLocaleString('vi-VN')+' ₫',speak:num.toLocaleString('vi-VN')+' đồng',value:num};
   return{key:raw,display:raw,speak:raw,value:0};
 }
-const THRESHOLD=0.5;
+const THRESHOLD=0.3;
 let classifier=null,stream=null,scanning=false,scanInterval=null,history=[],lastDetected=null;
 const $=id=>document.getElementById(id);
 const loadingScreen=$('loading-screen'),loadingMsg=$('loading-msg');
@@ -242,15 +242,15 @@ async function captureAndClassify(){
   const off=document.createElement('canvas');off.width=imgW;off.height=imgH;
   const offCtx=off.getContext('2d');offCtx.drawImage(captureCanvas,0,0,imgW,imgH);
   const d=offCtx.getImageData(0,0,imgW,imgH).data;
+  // Edge Impulse WASM luôn nhận RGB packed integer (0xRRGGBB) dù model grayscale hay RGB
   const features=[];
   for(let i=0;i<imgW*imgH;i++){
     const r=d[i*4],g=d[i*4+1],b=d[i*4+2];
-    if(imgCh===1)features.push((r*0.299+g*0.587+b*0.114)/255.0);
-    else features.push(((r<<16)|(g<<8)|b)&0xFFFFFF);
+    features.push(((r<<16)|(g<<8)|b));
   }
   try{
     setStatus('scanning','🔍 Đang nhận diện...');
-    const result=await Promise.resolve(classifier.classify(features));console.log("Raw result:",JSON.stringify(result));
+    const result=await Promise.resolve(classifier.classify(features));console.log("Raw result:",JSON.stringify(result));console.log("Features sample (first 5):",features.slice(0,5));
     handleResult(result,vw,vh);
   }catch(e){console.error(e);setStatus('ready','⚠️ Lỗi nhận diện');}
 }

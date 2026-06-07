@@ -235,8 +235,8 @@ async function captureAndClassify(){
   captureCtx.drawImage(camera,0,0,vw,vh);
   let props={};
   try{props=classifier.getProperties();}catch(e){console.warn('getProperties failed:',e);}
-  const imgW=props.image_input_width||props.input_width||96;
-  const imgH=props.image_input_height||props.input_height||96;
+  const imgW=props.image_input_width||props.input_width||320;
+  const imgH=props.image_input_height||props.input_height||320;
   const imgCh=props.image_input_frames||props.input_frames||3;
   console.log('Inferring with input size:',imgW,'x',imgH,'ch:',imgCh);
   const off=document.createElement('canvas');off.width=imgW;off.height=imgH;

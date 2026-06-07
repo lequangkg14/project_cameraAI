@@ -233,8 +233,12 @@ async function captureAndClassify(){
   const vw=camera.videoWidth||640,vh=camera.videoHeight||480;
   captureCanvas.width=vw;captureCanvas.height=vh;
   captureCtx.drawImage(camera,0,0,vw,vh);
-  const props=classifier.getProperties();
-  const imgW=props.image_input_width||96,imgH=props.image_input_height||96,imgCh=props.image_input_frames||3;
+  let props={};
+  try{props=classifier.getProperties();}catch(e){console.warn('getProperties failed:',e);}
+  const imgW=props.image_input_width||props.input_width||96;
+  const imgH=props.image_input_height||props.input_height||96;
+  const imgCh=props.image_input_frames||props.input_frames||3;
+  console.log('Inferring with input size:',imgW,'x',imgH,'ch:',imgCh);
   const off=document.createElement('canvas');off.width=imgW;off.height=imgH;
   const offCtx=off.getContext('2d');offCtx.drawImage(captureCanvas,0,0,imgW,imgH);
   const d=offCtx.getImageData(0,0,imgW,imgH).data;
@@ -246,7 +250,7 @@ async function captureAndClassify(){
   }
   try{
     setStatus('scanning','🔍 Đang nhận diện...');
-    const result=await Promise.resolve(classifier.classify(features));
+    const result=await Promise.resolve(classifier.classify(features));console.log("Raw result:",JSON.stringify(result));
     handleResult(result,vw,vh);
   }catch(e){console.error(e);setStatus('ready','⚠️ Lỗi nhận diện');}
 }

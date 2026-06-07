@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nhận Diện Tiền Việt Nam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --red:#C8102E;--gold:#FFCC00;--dark:#0D0D0D;--panel:#161616;
+      --card:#1E1E1E;--border:#2A2A2A;--text:#F0F0F0;--muted:#777;
+      --green:#22C55E;--shadow:0 8px 32px rgba(0,0,0,0.6);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Be Vietnam Pro',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+    header{background:linear-gradient(135deg,var(--red) 0%,#8B0000 100%);padding:16px 24px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 20px rgba(200,16,46,0.4);}
+    .flag{font-size:32px;line-height:1;}
+    header h1{font-size:1.3rem;font-weight:900;letter-spacing:-0.02em;line-height:1.2;}
+    header p{font-size:0.75rem;opacity:0.8;font-weight:300;}
+    main{flex:1;display:grid;grid-template-columns:1fr 340px;gap:20px;max-width:1200px;width:100%;margin:0 auto;padding:24px;}
+    @media(max-width:900px){main{grid-template-columns:1fr;padding:16px;}}
+    .camera-section{display:flex;flex-direction:column;gap:16px;}
+    .camera-wrapper{position:relative;background:#000;border-radius:16px;overflow:hidden;border:2px solid var(--border);aspect-ratio:4/3;box-shadow:var(--shadow);}
+    #camera{width:100%;height:100%;object-fit:cover;display:block;}
+    #overlay-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+    .camera-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:0.9rem;}
+    .camera-placeholder svg{opacity:0.3;}
+    .scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:scan 2s linear infinite;display:none;pointer-events:none;}
+    @keyframes scan{0%{top:0%;}100%{top:100%;}}
+    .scanning .scan-line{display:block;}
+    .corner{position:absolute;width:24px;height:24px;}
+    .corner.tl{top:12px;left:12px;border-top:3px solid var(--gold);border-left:3px solid var(--gold);}
+    .corner.tr{top:12px;right:12px;border-top:3px solid var(--gold);border-right:3px solid var(--gold);}
+    .corner.bl{bottom:12px;left:12px;border-bottom:3px solid var(--gold);border-left:3px solid var(--gold);}
+    .corner.br{bottom:12px;right:12px;border-bottom:3px solid var(--gold);border-right:3px solid var(--gold);}
+    .status-badge{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-size:0.72rem;font-weight:600;letter-spacing:0.05em;white-space:nowrap;backdrop-filter:blur(8px);}
+    .status-badge.ready{border-color:var(--green);color:var(--green);}
+    .status-badge.scanning{border-color:var(--gold);color:var(--gold);}
+    .status-badge.loading{border-color:var(--muted);color:var(--muted);}
+    .controls{display:flex;gap:12px;flex-wrap:wrap;}
+    .btn{flex:1;min-width:140px;padding:14px 20px;border-radius:12px;border:none;font-family:inherit;font-size:0.9rem;font-weight:700;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .btn:active{transform:scale(0.97);}
+    .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+    .btn-primary{background:var(--red);color:#fff;box-shadow:0 4px 16px rgba(200,16,46,0.4);}
+    .btn-primary:not(:disabled):hover{background:#e8132f;}
+    .btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border);}
+    .btn-secondary:not(:disabled):hover{border-color:var(--gold);color:var(--gold);}
+    .btn-gold{background:var(--gold);color:#000;box-shadow:0 4px 16px rgba(255,204,0,0.3);}
+    .btn-gold:not(:disabled):hover{background:#ffd829;}
+    .sidebar{display:flex;flex-direction:column;gap:16px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow);}
+    .card-title{font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+    .money-amount{font-size:3rem;font-weight:900;color:var(--gold);letter-spacing:-0.03em;line-height:1;margin-bottom:6px;text-shadow:0 0 30px rgba(255,204,0,0.4);transition:all 0.3s;}
+    .money-label{font-size:0.8rem;color:var(--muted);margin-bottom:16px;}
+    .confidence-bar-wrap{background:var(--panel);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;}
+    .confidence-bar{height:100%;background:linear-gradient(90deg,var(--red),var(--gold));border-radius:8px;width:0%;transition:width 0.4s ease;}
+    .confidence-label{font-size:0.72rem;color:var(--muted);text-align:right;}
+    #no-result{color:var(--muted);font-size:0.85rem;text-align:center;padding:8px 0;}
+    #speak-btn{width:100%;margin-top:16px;}
+    #history-list{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;}
+    #history-list::-webkit-scrollbar{width:4px;}
+    #history-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+    .history-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--panel);border-radius:10px;border:1px solid var(--border);font-size:0.82rem;animation:slideIn 0.2s ease;}
+    @keyframes slideIn{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}
+    .history-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+    .history-money{font-weight:700;color:var(--gold);flex:1;}
+    .history-conf{color:var(--muted);font-size:0.72rem;}
+    .history-time{color:var(--muted);font-size:0.68rem;}
+    .empty-history{color:var(--muted);font-size:0.82rem;text-align:center;padding:16px 0;}
+    .total-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;}
+    .total-label{font-size:0.82rem;color:var(--muted);}
+    .total-amount{font-size:1.4rem;font-weight:900;color:var(--green);}
+    #loading-screen{position:fixed;inset:0;background:var(--dark);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:100;}
+    .spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    #loading-screen p{color:var(--muted);font-size:0.85rem;}
+    @keyframes pulse-gold{0%{box-shadow:0 0 0 0 rgba(255,204,0,0.5);}70%{box-shadow:0 0 0 14px rgba(255,204,0,0);}100%{box-shadow:0 0 0 0 rgba(255,204,0,0);}}
+    .detected-pulse{animation:pulse-gold 0.6s ease;}
+  </style>
+</head>
+<body>
+<div id="loading-screen">
+  <div style="font-size:48px">🇻🇳</div>
+  <div class="spinner"></div>
+  <p id="loading-msg">Đang tải mô hình AI...</p>
+</div>
+<header>
+  <div class="flag">🇻🇳</div>
+  <div>
+    <h1>Nhận Diện Tiền Việt Nam</h1>
+    <p>Hỗ trợ tờ 10K · 20K · 50K · 100K VNĐ</p>
+  </div>
+</header>
+<main>
+  <div class="camera-section">
+    <div class="camera-wrapper" id="camera-wrapper">
+      <video id="camera" autoplay playsinline muted></video>
+      <canvas id="overlay-canvas"></canvas>
+      <div class="scan-line" id="scan-line"></div>
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="status-badge loading" id="status-badge">⏳ Đang tải...</div>
+      <div class="camera-placeholder" id="placeholder">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>Nhấn "Bật Camera" để bắt đầu</span>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="btn-camera" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Bật Camera
+      </button>
+      <button class="btn btn-secondary" id="btn-scan" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Quét Liên Tục
+      </button>
+      <button class="btn btn-gold" id="btn-capture" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        Chụp & Nhận Diện
+      </button>
+    </div>
+  </div>
+  <div class="sidebar">
+    <div class="card">
+      <div class="card-title">Kết Quả Nhận Diện</div>
+      <div id="result-display">
+        <div id="no-result">Chưa có kết quả</div>
+        <div id="result-data" style="display:none">
+          <div class="money-amount" id="money-amount">—</div>
+          <div class="money-label">Đồng Việt Nam</div>
+          <div class="confidence-bar-wrap"><div class="confidence-bar" id="conf-bar"></div></div>
+          <div class="confidence-label" id="conf-label">Độ tin cậy: 0%</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="speak-btn" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        Đọc Số Tiền
+      </button>
+    </div>
+    <div class="card">
+      <div class="card-title">Lịch Sử Nhận Diện</div>
+      <div id="history-list"><div class="empty-history">Chưa có lịch sử</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tổng Cộng</div>
+      <div class="total-row"><span class="total-label">Tổng số tờ:</span><span style="font-weight:700" id="total-count">0</span></div>
+      <div class="total-row" style="margin-top:8px"><span class="total-label">Tổng giá trị:</span><span class="total-amount" id="total-amount">0 ₫</span></div>
+      <button class="btn btn-secondary" id="btn-clear" style="width:100%;margin-top:14px;font-size:0.78rem">Xoá lịch sử</button>
+    </div>
+  </div>
+</main>
+<canvas id="capture-canvas" style="display:none"></canvas>
+<script src="edge-impulse-standalone.js"></script>
+<script src="run-impulse.js"></script>
+<script>
+const LABELS={
+  '10k':{display:'10.000 ₫',speak:'Mười nghìn đồng',value:10000},
+  '20k':{display:'20.000 ₫',speak:'Hai mươi nghìn đồng',value:20000},
+  '50k':{display:'50.000 ₫',speak:'Năm mươi nghìn đồng',value:50000},
+  '100k':{display:'100.000 ₫',speak:'Một trăm nghìn đồng',value:100000},
+};
+function resolveLabel(raw){
+  const key=raw.toLowerCase().replace(/\s/g,'');
+  if(LABELS[key])return{key,...LABELS[key]};
+  for(const k of Object.keys(LABELS))if(key.includes(k)||k.includes(key))return{key:k,...LABELS[k]};
+  const num=parseInt(raw.replace(/[^0-9]/g,''));
+  if(!isNaN(num))return{key:raw,display:num.toLocaleString('vi-VN')+' ₫',speak:num.toLocaleString('vi-VN')+' đồng',value:num};
+  return{key:raw,display:raw,speak:raw,value:0};
+}
+const THRESHOLD=0.5;
+let classifier=null,stream=null,scanning=false,scanInterval=null,history=[],lastDetected=null;
+const $=id=>document.getElementById(id);
+const loadingScreen=$('loading-screen'),loadingMsg=$('loading-msg');
+const camera=$('camera'),overlayCanvas=$('overlay-canvas'),captureCanvas=$('capture-canvas');
+const overlayCtx=overlayCanvas.getContext('2d'),captureCtx=captureCanvas.getContext('2d');
+const placeholder=$('placeholder'),statusBadge=$('status-badge'),cameraWrapper=$('camera-wrapper');
+const btnCamera=$('btn-camera'),btnScan=$('btn-scan'),btnCapture=$('btn-capture'),speakBtn=$('speak-btn'),btnClear=$('btn-clear');
+const noResult=$('no-result'),resultData=$('result-data'),moneyAmount=$('money-amount');
+const confBar=$('conf-bar'),confLabel=$('conf-label'),historyList=$('history-list');
+const totalCount=$('total-count'),totalAmount=$('total-amount');
+
+(async()=>{
+  try{
+    loadingMsg.textContent='Đang khởi tạo WASM...';
+    classifier=new EdgeImpulseClassifier();
+    await classifier.init();
+    const info=classifier.getProjectInfo();
+    console.log('Model:',info);
+    loadingMsg.textContent='Sẵn sàng!';
+    setTimeout(()=>{loadingScreen.style.display='none';btnCamera.disabled=false;setStatus('ready','✅ AI Sẵn Sàng');},600);
+  }catch(e){loadingMsg.textContent='Lỗi: '+e.message;console.error(e);}
+})();
+
+btnCamera.addEventListener('click',async()=>{
+  if(stream){stopCamera();return;}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:640},height:{ideal:480}}});
+    camera.srcObject=stream;await camera.play();
+    placeholder.style.display='none';
+    btnCamera.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Tắt Camera';
+    btnScan.disabled=false;btnCapture.disabled=false;
+    setStatus('ready','✅ Camera Bật');syncOverlay();
+  }catch(e){alert('Không thể mở camera: '+e.message);}
+});
+
+function stopCamera(){
+  if(scanning)toggleScan();
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  camera.srcObject=null;placeholder.style.display='flex';
+  btnCamera.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Bật Camera';
+  btnScan.disabled=true;btnCapture.disabled=true;
+  setStatus('ready','✅ AI Sẵn Sàng');
+  overlayCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
+}
+
+function syncOverlay(){
+  const r=cameraWrapper.getBoundingClientRect();
+  overlayCanvas.width=camera.videoWidth||r.width;
+  overlayCanvas.height=camera.videoHeight||r.height;
+}
+window.addEventListener('resize',syncOverlay);
+
+btnCapture.addEventListener('click',captureAndClassify);
+
+async function captureAndClassify(){
+  if(!stream||!classifier)return;
+  syncOverlay();
+  const vw=camera.videoWidth||640,vh=camera.videoHeight||480;
+  captureCanvas.width=vw;captureCanvas.height=vh;
+  captureCtx.drawImage(camera,0,0,vw,vh);
+  const props=classifier.getProperties();
+  const imgW=props.image_input_width||96,imgH=props.image_input_height||96,imgCh=props.image_input_frames||3;
+  const off=document.createElement('canvas');off.width=imgW;off.height=imgH;
+  const offCtx=off.getContext('2d');offCtx.drawImage(captureCanvas,0,0,imgW,imgH);
+  const d=offCtx.getImageData(0,0,imgW,imgH).data;
+  const features=[];
+  for(let i=0;i<imgW*imgH;i++){
+    const r=d[i*4],g=d[i*4+1],b=d[i*4+2];
+    if(imgCh===1)features.push((r*0.299+g*0.587+b*0.114)/255.0);
+    else features.push(((r<<16)|(g<<8)|b)&0xFFFFFF);
+  }
+  try{
+    setStatus('scanning','🔍 Đang nhận diện...');
+    const result=await Promise.resolve(classifier.classify(features));
+    handleResult(result,vw,vh);
+  }catch(e){console.error(e);setStatus('ready','⚠️ Lỗi nhận diện');}
+}
+
+btnScan.addEventListener('click',toggleScan);
+function toggleScan(){
+  scanning=!scanning;
+  if(scanning){
+    cameraWrapper.classList.add('scanning');
+    btnScan.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Dừng Quét';
+    btnScan.style.borderColor='#ef4444';btnScan.style.color='#ef4444';
+    setStatus('scanning','🔍 Đang Quét...');
+    scanInterval=setInterval(captureAndClassify,1500);
+  }else{
+    cameraWrapper.classList.remove('scanning');
+    btnScan.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Quét Liên Tục';
+    btnScan.style.borderColor='';btnScan.style.color='';
+    clearInterval(scanInterval);setStatus('ready','✅ Camera Bật');
+  }
+}
+
+function handleResult(res,videoW,videoH){
+  overlayCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
+  let best=null;
+  if(res.results&&res.results.length>0)best=res.results.reduce((a,b)=>a.value>b.value?a:b);
+  if(!best||best.value<THRESHOLD){setStatus('ready','❓ Không nhận ra');return;}
+  const info=resolveLabel(best.label);
+  lastDetected={info,confidence:best.value};
+  if(best.x!==undefined){
+    const sx=overlayCanvas.width/videoW,sy=overlayCanvas.height/videoH;
+    const bx=best.x*videoW*sx,by=best.y*videoH*sy,bw=best.width*videoW*sx,bh=best.height*videoH*sy;
+    overlayCtx.strokeStyle='#FFCC00';overlayCtx.lineWidth=3;
+    overlayCtx.strokeRect(bx,by,bw,bh);
+    overlayCtx.fillStyle='rgba(255,204,0,0.12)';overlayCtx.fillRect(bx,by,bw,bh);
+    overlayCtx.fillStyle='#FFCC00';overlayCtx.font='bold 15px Be Vietnam Pro,sans-serif';
+    overlayCtx.fillText(info.display+' ('+Math.round(best.value*100)+'%)',bx+4,by>20?by-8:by+bh+18);
+  }
+  showResult(info,best.value);
+  addHistory(info,best.value);
+  speakBtn.disabled=false;
+  if(scanning)speak(info.speak);
+  setStatus('ready','✅ Đã Nhận Diện');
+}
+
+function showResult(info,confidence){
+  noResult.style.display='none';resultData.style.display='block';
+  moneyAmount.textContent=info.display;
+  const pct=Math.round(confidence*100);
+  confBar.style.width=pct+'%';confLabel.textContent='Độ tin cậy: '+pct+'%';
+  resultData.classList.remove('detected-pulse');void resultData.offsetWidth;resultData.classList.add('detected-pulse');
+}
+
+function addHistory(info,confidence){
+  const now=new Date();
+  const t=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
+  history.unshift({info,confidence,time:t});renderHistory();
+}
+
+function renderHistory(){
+  if(!history.length){historyList.innerHTML='<div class="empty-history">Chưa có lịch sử</div>';totalCount.textContent='0';totalAmount.textContent='0 ₫';return;}
+  historyList.innerHTML=history.slice(0,20).map(h=>`<div class="history-item"><div class="history-dot"></div><span class="history-money">${h.info.display}</span><span class="history-conf">${Math.round(h.confidence*100)}%</span><span class="history-time">${h.time}</span></div>`).join('');
+  totalCount.textContent=history.length;
+  totalAmount.textContent=history.reduce((s,h)=>s+(h.info.value||0),0).toLocaleString('vi-VN')+' ₫';
+}
+
+btnClear.addEventListener('click',()=>{
+  history=[];lastDetected=null;renderHistory();
+  noResult.style.display='block';resultData.style.display='none';
+  speakBtn.disabled=true;overlayCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
+});
+
+speakBtn.addEventListener('click',()=>{if(lastDetected)speak(lastDetected.info.speak);});
+function speak(text){
+  if(!window.speechSynthesis){alert('Trình duyệt không hỗ trợ TTS!');return;}
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';u.rate=0.9;u.pitch=1;u.volume=1;
+  const voices=window.speechSynthesis.getVoices();
+  const vi=voices.find(v=>v.lang.startsWith('vi'));if(vi)u.voice=vi;
+  window.speechSynthesis.speak(u);
+}
+window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+function setStatus(type,text){statusBadge.textContent=text;statusBadge.className='status-badge '+type;}
+</script>
+</body>
+</html>

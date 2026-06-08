@@ -326,12 +326,41 @@ speakBtn.addEventListener('click',()=>{if(lastDetected)speak(lastDetected.info.s
 function speak(text){
   if(!window.speechSynthesis){alert('Trình duyệt không hỗ trợ TTS!');return;}
   window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';u.rate=0.7;u.pitch=1;u.volume=1;
-  const voices=window.speechSynthesis.getVoices();
-  const vi=voices.find(v=>v.lang.startsWith('vi'));if(vi)u.voice=vi;
+  
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='vi-VN';
+  u.pitch=1;
+  u.volume=1;
+  
+  const voices = window.speechSynthesis.getVoices();
+  
+  // Thuật toán lọc tìm giọng đọc tối ưu:
+  // 1. Ưu tiên tìm giọng đọc tự nhiên cao cấp (Có chữ 'Natural' - cực hay trên laptop dùng Edge)
+  // 2. Ưu tiên tìm giọng của Apple (Dành cho iPhone để giữ nguyên chất lượng bạn đang thấy ổn định)
+  // 3. Ưu tiên tìm giọng của Google (Dành cho Chrome trên máy tính)
+  // 4. Fallback cuối cùng: Lấy bất kỳ giọng tiếng Việt nào khả dụng
+  const viVoice = voices.find(v => v.lang.startsWith('vi') && v.name.includes('Natural')) ||
+                  voices.find(v => v.lang.startsWith('vi') && v.name.includes('Apple')) ||
+                  voices.find(v => v.lang.startsWith('vi') && v.name.includes('Google')) ||
+                  voices.find(v => v.lang.startsWith('vi'));
+                  
+  if(viVoice){
+    u.voice = viVoice;
+    // Nếu bốc trúng giọng Google mặc định dở trên laptop Chrome, ép đọc chậm hẳn xuống 0.75 để dễ nghe.
+    // Nếu là giọng Natural hoặc giọng Apple trên iPhone, giữ tốc độ mượt 0.88.
+    u.rate = viVoice.name.includes('Google') ? 0.75 : 0.88;
+    console.log("Mã đang chạy giọng đọc:", viVoice.name, "với tốc độ:", u.rate);
+  } else {
+    u.rate = 0.75;
+  }
+  
   window.speechSynthesis.speak(u);
 }
-window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+
+// Bắt buộc thêm sự kiện này để đồng bộ danh sách giọng ngay khi trình duyệt khởi chạy xong trên laptop
+if (window.speechSynthesis.onvoiceschanged !== undefined) {
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 function setStatus(type,text){statusBadge.textContent=text;statusBadge.className='status-badge '+type;}
 </script>
 </body>

@@ -162,7 +162,7 @@ const LABELS={
   '10k':{display:'10.000 ₫',speak:'Mười nghìn đồng',value:10000},
   '20k':{display:'20.000 ₫',speak:'Hai mươi nghìn đồng',value:20000},
   '50k':{display:'50.000 ₫',speak:'Năm mươi nghìn đồng',value:50000},
-  '100k':{display:'100.000 ₫',speak:'Hết tiền rồi',value:100000},
+  '100k':{display:'100.000 ₫',speak:'Trăm nghìn',value:100000},
 };
 function resolveLabel(raw){
   const key=raw.toLowerCase().replace(/\s/g,'');
@@ -326,7 +326,7 @@ speakBtn.addEventListener('click',()=>{if(lastDetected)speak(lastDetected.info.s
 function speak(text){
   if(!window.speechSynthesis){alert('Trình duyệt không hỗ trợ TTS!');return;}
   window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';u.rate=0.9;u.pitch=1;u.volume=1;
+  const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';u.rate=0.7;u.pitch=1;u.volume=1;
   const voices=window.speechSynthesis.getVoices();
   const vi=voices.find(v=>v.lang.startsWith('vi'));if(vi)u.voice=vi;
   window.speechSynthesis.speak(u);

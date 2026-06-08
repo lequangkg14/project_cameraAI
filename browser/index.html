@@ -172,8 +172,9 @@ function resolveLabel(raw){
   if(!isNaN(num))return{key:raw,display:num.toLocaleString('vi-VN')+' ₫',speak:num.toLocaleString('vi-VN')+' đồng',value:num};
   return{key:raw,display:raw,speak:raw,value:0};
 }
-const THRESHOLD=0.3;
-let classifier=null,stream=null,scanning=false,scanInterval=null,history=[],lastDetected=null;
+const THRESHOLD=0.8;
+let classifier=null,stream=null,scanning=false,scanInterval=null,history=[],lastDetected=null,lastSpeakTime=0,lastDetectedKey=null;
+const COOLDOWN_MS=3000; // 3s delay giữa các lần đọc cùng 1 tờ
 const $=id=>document.getElementById(id);
 const loadingScreen=$('loading-screen'),loadingMsg=$('loading-msg');
 const camera=$('camera'),overlayCanvas=$('overlay-canvas'),captureCanvas=$('capture-canvas');
@@ -272,27 +273,77 @@ function toggleScan(){
   }
 }
 
+// Màu khác nhau cho từng loại tiền
+const BILL_COLORS={'10k':'#22C55E','20k':'#3B82F6','50k':'#FFCC00','100k':'#F97316'};
+
 function handleResult(res,videoW,videoH){
   overlayCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
-  let best=null;
-  if(res.results&&res.results.length>0)best=res.results.reduce((a,b)=>a.value>b.value?a:b);
-  if(!best||best.value<THRESHOLD){setStatus('ready','❓ Không nhận ra');return;}
-  const info=resolveLabel(best.label);
-  lastDetected={info,confidence:best.value};
-  if(best.x!==undefined){
-    const sx=overlayCanvas.width/videoW,sy=overlayCanvas.height/videoH;
-    const bx=best.x*videoW*sx,by=best.y*videoH*sy,bw=best.width*videoW*sx,bh=best.height*videoH*sy;
-    overlayCtx.strokeStyle='#FFCC00';overlayCtx.lineWidth=3;
-    overlayCtx.strokeRect(bx,by,bw,bh);
-    overlayCtx.fillStyle='rgba(255,204,0,0.12)';overlayCtx.fillRect(bx,by,bw,bh);
-    overlayCtx.fillStyle='#FFCC00';overlayCtx.font='bold 15px Be Vietnam Pro,sans-serif';
-    overlayCtx.fillText(info.display+' ('+Math.round(best.value*100)+'%)',bx+4,by>20?by-8:by+bh+18);
-  }
-  showResult(info,best.value);
-  addHistory(info,best.value);
+  if(!res.results||res.results.length===0){setStatus('ready','❓ Không nhận ra');return;}
+
+  // Lọc tất cả detection đủ threshold (multi-bill support)
+  const detected=res.results.filter(r=>r.value>=THRESHOLD);
+  if(detected.length===0){setStatus('ready','❓ Không nhận ra');return;}
+
+  const sx=overlayCanvas.width/videoW,sy=overlayCanvas.height/videoH;
+  const now=Date.now();
+  const toSpeak=[];
+
+  detected.forEach(det=>{
+    const info=resolveLabel(det.label);
+    const color=BILL_COLORS[info.key]||'#FFCC00';
+
+    // Vẽ bounding box với màu riêng từng tờ
+    if(det.x!==undefined){
+      const bx=det.x*videoW*sx,by=det.y*videoH*sy,bw=det.width*videoW*sx,bh=det.height*videoH*sy;
+      overlayCtx.strokeStyle=color;overlayCtx.lineWidth=3;
+      overlayCtx.strokeRect(bx,by,bw,bh);
+      overlayCtx.fillStyle=color+'22';overlayCtx.fillRect(bx,by,bw,bh);
+      // Label với nền
+      const label=info.display+' ('+Math.round(det.value*100)+'%)';
+      overlayCtx.font='bold 14px Be Vietnam Pro,sans-serif';
+      const tw=overlayCtx.measureText(label).width;
+      const ly=by>24?by-6:by+bh+18;
+      overlayCtx.fillStyle=color;overlayCtx.fillRect(bx,ly-16,tw+10,20);
+      overlayCtx.fillStyle='#000';overlayCtx.fillText(label,bx+5,ly);
+    }
+
+    // Cooldown per tờ tiền: chỉ đọc lại nếu khác tờ hoặc qua 3s
+    const lastKey=lastDetectedKey;
+    if(scanning && (info.key!==lastKey || now-lastSpeakTime>COOLDOWN_MS)){
+      toSpeak.push(info);
+    }
+  });
+
+  // Hiển thị tờ có confidence cao nhất
+  const best=detected.reduce((a,b)=>a.value>b.value?a:b);
+  const bestInfo=resolveLabel(best.label);
+  lastDetected={info:bestInfo,confidence:best.value};
+  showResult(bestInfo,best.value);
+
+  // Chỉ thêm lịch sử cho tờ có confidence cao nhất mỗi lần quét
+  addHistory(bestInfo,best.value);
   speakBtn.disabled=false;
-  if(scanning)speak(info.speak);
-  setStatus('ready','✅ Đã Nhận Diện');
+
+  // Đọc tên tờ tiền (nếu nhiều tờ khác nhau thì đọc lần lượt)
+  if(toSpeak.length>0){
+    const uniqueKeys=[...new Set(toSpeak.map(i=>i.key))];
+    const uniqueInfos=uniqueKeys.map(k=>toSpeak.find(i=>i.key===k));
+    speakQueue(uniqueInfos);
+    lastSpeakTime=now;
+    lastDetectedKey=uniqueKeys[uniqueKeys.length-1];
+  }
+
+  const count=detected.length;
+  setStatus('ready', count>1 ? `✅ Phát hiện ${count} tờ tiền` : '✅ Đã Nhận Diện');
+}
+
+// Đọc lần lượt nhiều tờ tiền
+function speakQueue(infos,idx=0){
+  if(idx>=infos.length)return;
+  const audio=new Audio(AUDIO_FILES[infos[idx].key]);
+  audio.onerror=()=>{speakTTS(infos[idx].speak);setTimeout(()=>speakQueue(infos,idx+1),1500);};
+  audio.onended=()=>speakQueue(infos,idx+1);
+  audio.play().catch(()=>{speakTTS(infos[idx].speak);setTimeout(()=>speakQueue(infos,idx+1),1500);});
 }
 
 function showResult(info,confidence){
@@ -322,16 +373,34 @@ btnClear.addEventListener('click',()=>{
   speakBtn.disabled=true;overlayCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
 });
 
-speakBtn.addEventListener('click',()=>{if(lastDetected)speak(lastDetected.info.speak);});
-function speak(text){
-  if(!window.speechSynthesis){alert('Trình duyệt không hỗ trợ TTS!');return;}
+speakBtn.addEventListener('click',()=>{if(lastDetected)speakMoney(lastDetected.info);});
+// Âm thanh pre-recorded (đặt file mp3 trong thư mục audio/)
+const AUDIO_FILES={
+  '10k':'audio/10k.mp3',
+  '20k':'audio/20k.mp3',
+  '50k':'audio/50k.mp3',
+  '100k':'audio/100k.mp3',
+};
+function speakMoney(info){
+  const audioSrc=AUDIO_FILES[info.key];
+  if(audioSrc){
+    const audio=new Audio(audioSrc);
+    audio.onerror=()=>speakTTS(info.speak); // fallback TTS nếu không có file
+    audio.play().catch(()=>speakTTS(info.speak));
+  } else {
+    speakTTS(info.speak);
+  }
+}
+function speakTTS(text){
+  if(!window.speechSynthesis)return;
   window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';u.rate=0.9;u.pitch=1;u.volume=1;
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='vi-VN';u.rate=0.8;u.pitch=1;u.volume=1;
   const voices=window.speechSynthesis.getVoices();
   const vi=voices.find(v=>v.lang.startsWith('vi'));if(vi)u.voice=vi;
   window.speechSynthesis.speak(u);
 }
-window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+window.speechSynthesis&&(window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices());
 function setStatus(type,text){statusBadge.textContent=text;statusBadge.className='status-badge '+type;}
 </script>
 </body>
